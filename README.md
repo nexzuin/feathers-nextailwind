@@ -1,45 +1,103 @@
-# jobsheet
+# Next.JS & Feathers.JS
 
-> CV. Atkomindo Dinamika
+## 1. Instal & Generate FeathersJS
+    $ npm i -g @feathersjs/cli
+    $ mkdir awesome-project && cd awesome-project
+    $ feathers generate app
 
-## About
+## 2. Add the Next.JS support
+    $ yarn add next react react-dom react-hook-form @headlessui/react @tailwindcss/forms sweetalert2
 
-This project uses [Feathers](http://feathersjs.com). An open source web framework for building modern real-time applications.
+    $ yarn add -D tailwindcss postcss autoprefixer
+    
+## 3. Create Folder & Files
+### 3.1 Client folder
+    $ mkdir client/pages
 
-## Getting Started
+### 3.2 client/jsconfig.json
+    // client/jsconfig.json
+    {
+        "compilerOptions": {
+            "baseUrl": ".",
+            "paths": {
+                "@/components/*": ["components/*"],
+                "@/context/*": ["context/*"],
+            }
+        }
+    }
 
-Getting up and running is as easy as 1, 2, 3.
+### 3.3 client/context/state.js
+    // context/state.js
+    import { createContext, useContext } from 'react';
 
-1. Make sure you have [NodeJS](https://nodejs.org/) and [npm](https://www.npmjs.com/) installed.
-2. Install your dependencies
+    const AppContext = createContext();
 
-    ```
-    cd path/to/jobsheet
-    npm install
-    ```
+    export function AppWrapper({ children }) {
+    let sharedState = {/* whatever you want */}
 
-3. Start your app
+    return (
+        <AppContext.Provider value={sharedState}>
+            {children}
+        </AppContext.Provider>
+    );
+    }
 
-    ```
-    npm start
-    ```
+    export function useAppContext() {
+        return useContext(AppContext);
+    }
+### 3.4 client/pages/_app.jsx
+    // client/pages/_app.jsx
+    import { AppWrapper } from '@/context/state';
 
-## Testing
+    export default function Application({ Component, pageProps }) {
+        return (
+            <AppWrapper>
+                <Component {...pageProps} />
+            </AppWrapper>
+        )
+    }
+### 3.5 server/nextApp.js
+    const next = require("next");
 
-Simply run `npm test` and all your tests in the `test/` directory will be run.
+    const dev = process.env.NODE_ENV !== "production";
+    const nextApp = next({ dir: "./client", dev });
+    const handle = nextApp.getRequestHandler();
 
-## Scaffolding
+    module.exports = {
+        nextApp,
+        handle
+    };
 
-Feathers has a powerful command line interface. Here are a few things it can do:
+### 3.6 server/index.js
+    const logger = require("winston");
+    const app = require("./app");
+    const port = app.get("port");
+    const nextApp = require("./nextApp").nextApp;
 
-```
-$ npm install -g @feathersjs/cli          # Install Feathers CLI
+    nextApp.prepare().then(() => {
+    const server = app.listen(port);
 
-$ feathers generate service               # Generate a new Service
-$ feathers generate hook                  # Generate a new Hook
-$ feathers help                           # Show all commands
-```
+    process.on("unhandledRejection", (reason, p) =>
+        logger.error("Unhandled Rejection at: Promise ", p, reason)
+    );
 
-## Help
+    server.on("listening", () =>
+        logger.info(
+            "Feathers application started on http://%s:%d", app.get("host"), port)
+            );
+    });
+### 3.7 server/middleware/index.js
+    const next = require("./next");
 
-For more information on all the things you can do with Feathers visit [docs.feathersjs.com](http://docs.feathersjs.com).
+    module.exports = function(app) {
+    app.get("*", next());
+    };
+
+### 3.8 server/middleware/next.js
+    const handle = require("../nextApp").handle;
+
+    module.exports = function(options = {}) {
+        return function next(req, res, next) {
+        return handle(req, res);
+        };
+    };
